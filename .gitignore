@@ -23,3 +23,4 @@ data/processed/*
 # IDE
 .vscode/
 .idea/
+*.egg-info/
