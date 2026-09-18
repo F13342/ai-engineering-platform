@@ -21,3 +21,18 @@ def test_service_adds_project() -> None:
     service.add_project(project)
 
     assert service.list_projects() == [project]
+def test_service_adds_project_with_name_and_description() -> None:
+    registry = ProjectRegistry()
+    service = ProjectService(registry)
+
+    service.add_project(
+        Project(
+            name="Test Project",
+            description="Test description",
+        )
+    )
+
+    project = service.list_projects()[0]
+
+    assert project.name == "Test Project"
+    assert project.description == "Test description"

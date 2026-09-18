@@ -29,9 +29,19 @@ def create_parser() -> argparse.ArgumentParser:
         help="List all projects",
     )
 
-    project_subparsers.add_parser(
+    add_parser = project_subparsers.add_parser(
         "add",
         help="Add a new project",
+    )
+
+    add_parser.add_argument(
+        "--name",
+        help="Project name",
+    )
+
+    add_parser.add_argument(
+        "--description",
+        help="Project description",
     )
 
     return parser
@@ -57,10 +67,21 @@ def main() -> None:
     arguments = parser.parse_args()
 
     if arguments.command == "project":
+        service = create_project_service()
+
         if arguments.project_command == "list":
-            service = create_project_service()
             projects = service.list_projects()
             print(format_project_list(projects))
+
+        elif arguments.project_command == "add":
+            project = Project(
+                name=arguments.name,
+                description=arguments.description or "",
+            )
+
+            service.add_project(project)
+
+            print(f"Project added: {project.name}")
 
 
 if __name__ == "__main__":
