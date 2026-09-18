@@ -36,3 +36,12 @@ def test_project_rejects_whitespace_only_name() -> None:
             name="   ",
             description="Valid project description",
         )
+def test_project_rejects_whitespace_only_description() -> None:
+    with pytest.raises(
+        ValueError,
+        match="Project description cannot be empty",
+    ):
+        Project(
+            name="AI Engineering Platform",
+            description="   ",
+        )
