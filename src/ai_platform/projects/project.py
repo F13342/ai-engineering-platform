@@ -5,6 +5,9 @@ class Project:
         if not name.strip():
             raise ValueError("Project name cannot be empty")
 
+        if not description.strip():
+            raise ValueError("Project description cannot be empty")
+
         self.name = name
         self.description = description
 
