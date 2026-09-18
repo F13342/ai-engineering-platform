@@ -1,9 +1,13 @@
 import argparse
+from pathlib import Path
 
 from ai_platform.projects.formatter import format_project_list
 from ai_platform.projects.project import Project
-from ai_platform.projects.registry import ProjectRegistry
+from ai_platform.projects.repository import ProjectRepository
 from ai_platform.projects.service import ProjectService
+
+
+PROJECTS_FILE = Path("data/projects.json")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -48,17 +52,10 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def create_project_service() -> ProjectService:
-    """Create the project service with initial project data."""
-    registry = ProjectRegistry()
+    """Create the project service with JSON persistence."""
+    repository = ProjectRepository(PROJECTS_FILE)
 
-    registry.add_project(
-        Project(
-            name="AI Engineering Platform",
-            description="Learning and development platform",
-        )
-    )
-
-    return ProjectService(registry)
+    return ProjectService(repository)
 
 
 def main() -> None:
