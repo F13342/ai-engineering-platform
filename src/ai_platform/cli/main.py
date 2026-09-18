@@ -1,5 +1,10 @@
 import argparse
 
+from ai_platform.projects.formatter import format_project_list
+from ai_platform.projects.project import Project
+from ai_platform.projects.registry import ProjectRegistry
+from ai_platform.projects.service import ProjectService
+
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the command-line argument parser."""
@@ -27,10 +32,30 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def create_project_service() -> ProjectService:
+    """Create the project service with initial project data."""
+    registry = ProjectRegistry()
+
+    registry.add_project(
+        Project(
+            name="AI Engineering Platform",
+            description="Learning and development platform",
+        )
+    )
+
+    return ProjectService(registry)
+
+
 def main() -> None:
     """Run the command-line interface."""
     parser = create_parser()
-    parser.parse_args()
+    arguments = parser.parse_args()
+
+    if arguments.command == "project":
+        if arguments.project_command == "list":
+            service = create_project_service()
+            projects = service.list_projects()
+            print(format_project_list(projects))
 
 
 if __name__ == "__main__":
