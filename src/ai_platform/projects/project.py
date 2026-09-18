@@ -4,3 +4,13 @@ class Project:
     def __init__(self, name: str, description: str) -> None:
         self.name = name
         self.description = description
+
+    def __eq__(self, other: object) -> bool:
+        """Compare projects by name and description."""
+        if not isinstance(other, Project):
+            return NotImplemented
+
+        return (
+            self.name == other.name
+            and self.description == other.description
+        )
