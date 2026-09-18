@@ -1,3 +1,4 @@
+import pytest
 from ai_platform.projects.project import Project
 
 
@@ -9,3 +10,10 @@ def test_project_can_be_created() -> None:
 
     assert project.name == "AI Engineering Platform"
     assert project.description == "Learning and development platform"
+
+def test_project_requires_name() -> None:
+    with pytest.raises(ValueError, match="Project name cannot be empty"):
+        Project(
+            name="",
+            description="Project without a name",
+        )
