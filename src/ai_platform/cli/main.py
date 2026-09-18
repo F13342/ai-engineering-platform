@@ -29,6 +29,11 @@ def create_parser() -> argparse.ArgumentParser:
         help="List all projects",
     )
 
+    project_subparsers.add_parser(
+        "add",
+        help="Add a new project",
+    )
+
     return parser
 
 

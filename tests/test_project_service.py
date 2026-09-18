@@ -11,3 +11,13 @@ def test_service_lists_registered_projects() -> None:
     registry.add_project(project)
 
     assert service.list_projects() == [project]
+
+
+def test_service_adds_project() -> None:
+    registry = ProjectRegistry()
+    service = ProjectService(registry)
+    project = Project("Project Two", "Second project")
+
+    service.add_project(project)
+
+    assert service.list_projects() == [project]

@@ -14,3 +14,10 @@ def test_cli_supports_project_list_command() -> None:
 
     assert arguments.command == "project"
     assert arguments.project_command == "list"
+def test_cli_supports_project_add_command() -> None:
+    parser = create_parser()
+
+    arguments = parser.parse_args(["project", "add"])
+
+    assert arguments.command == "project"
+    assert arguments.project_command == "add"
