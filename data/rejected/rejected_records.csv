@@ -1,0 +1,5 @@
+student_id,student_name,age,major,city,gpa,attendance,status,course_count,average_score,score,performance_level,attendance_status,reason
+1003,Fatima Hassan,20.0,Information Technology,Dhamar,2.8,76.0,Active,1.0,78.0,78.0,Medium,Good,duplicate student_id
+1005,Sara Ahmed,15.0,Information Technology,Sanaa,4.2,105.0,Active,1.0,105.0,105.0,High,Good,invalid age; invalid gpa; invalid attendance; invalid score
+1006,Omar Khaled,85.0,Computer Science,Dhamar,1.9,65.0,Inactive,1.0,65.0,65.0,Low,Low,invalid age
+,Unknown Student,25.0,Information Technology,Sanaa,,,,,,,,Low,missing student_id
