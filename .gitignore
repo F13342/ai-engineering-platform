@@ -24,3 +24,4 @@ data/processed/*
 .vscode/
 .idea/
 *.egg-info/
+database/ai_platform.db
