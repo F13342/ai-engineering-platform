@@ -7,6 +7,8 @@ from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from ai_platform.api.schemas import (
     InferenceRequest,
     InferenceResponse,
+    ActiveModelVersionRequest,
+    ActiveModelVersionResponse,
     ModelMetadataResponse,
     ModelStatusUpdate,
     ModelVersionComparisonResponse,
@@ -19,17 +21,29 @@ from ai_platform.database.repositories.training_run_repository import (
 from ai_platform.machine_learning.inference.runtime import (
     ModelInferenceRuntime,
 )
-from ai_platform.machine_learning.versions import ModelVersionComparisonService
+from ai_platform.machine_learning.versions import (
+    ActiveModelVersionService,
+    ModelVersionComparisonService,
+)
 
 
 def create_app(
     runtime: ModelInferenceRuntime | None = None,
     training_run_repository: TrainingRunRepository | None = None,
     version_comparison_service: ModelVersionComparisonService | None = None,
+    active_version_service: ActiveModelVersionService | None = None,
 ) -> FastAPI:
     """Create the API with injectable inference and training dependencies."""
+    active_versions = active_version_service
+    if active_versions is None and runtime is not None:
+        active_versions = getattr(runtime, "active_versions", None)
+    if active_versions is None:
+        active_versions = ActiveModelVersionService()
+
     inference_runtime = (
-        runtime if runtime is not None else ModelInferenceRuntime()
+        runtime
+        if runtime is not None
+        else ModelInferenceRuntime(active_version_service=active_versions)
     )
     run_repository = (
         training_run_repository
@@ -164,6 +178,79 @@ def create_app(
             raise HTTPException(
                 status_code=500,
                 detail="Model status update failed.",
+            ) from exc
+
+    @app.get(
+        "/v1/models/by-name/{name}/active",
+        response_model=ActiveModelVersionResponse,
+        tags=["models"],
+    )
+    def get_active_model_version(
+        name: str = Path(min_length=1, max_length=200),
+    ) -> dict[str, object]:
+        """Return the currently selected version for a model name."""
+        try:
+            record = active_versions.get_active_version(name)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        if record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No active version configured for model: {name}",
+            )
+
+        return record
+
+    @app.put(
+        "/v1/models/by-name/{name}/active",
+        response_model=ActiveModelVersionResponse,
+        tags=["models"],
+        dependencies=[Depends(require_api_key)],
+    )
+    def activate_model_version(
+        request: ActiveModelVersionRequest,
+        name: str = Path(min_length=1, max_length=200),
+    ) -> dict[str, object]:
+        """Activate a ready model version through the protected API."""
+        try:
+            return active_versions.activate_version(name, request.model_id)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Active model version update failed.",
+            ) from exc
+
+    @app.post(
+        "/v1/models/by-name/{name}/predict",
+        response_model=InferenceResponse,
+        tags=["inference"],
+    )
+    def predict_active_model(
+        request: InferenceRequest,
+        name: str = Path(min_length=1, max_length=200),
+    ) -> dict[str, object]:
+        """Execute inference with the currently active model version."""
+        try:
+            return inference_runtime.predict_active(name, request.inputs)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            status_code = (
+                409 if "not ready" in str(exc).lower() else 422
+            )
+            raise HTTPException(
+                status_code=status_code,
+                detail=str(exc),
+            ) from exc
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Active model inference failed.",
             ) from exc
 
     @app.get(

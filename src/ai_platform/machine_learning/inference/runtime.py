@@ -1,10 +1,11 @@
-﻿"""Model inference runtime for the AI platform."""
+"""Model inference runtime for the AI platform."""
 
 import math
 import time
 from typing import Protocol
 
 from ai_platform.machine_learning.registry import ModelRegistryService
+from ai_platform.machine_learning.versions import ActiveModelVersionService
 
 
 class PredictionAdapter(Protocol):
@@ -63,9 +64,15 @@ class ModelInferenceRuntime:
         self,
         registry: ModelRegistryService | None = None,
         adapter: PredictionAdapter | None = None,
+        active_version_service: ActiveModelVersionService | None = None,
     ) -> None:
-        self.registry = registry or ModelRegistryService()
-        self.adapter = adapter or PredictMethodAdapter()
+        self.registry = registry if registry is not None else ModelRegistryService()
+        self.adapter = adapter if adapter is not None else PredictMethodAdapter()
+        self.active_versions = (
+            active_version_service
+            if active_version_service is not None
+            else ActiveModelVersionService()
+        )
         self._loaded_models: dict[tuple[int, str, str], object] = {}
 
     def predict(
@@ -126,6 +133,37 @@ class ModelInferenceRuntime:
             "predictions": predictions,
             "inference_latency_ms": round(latency_ms, 3),
         }
+
+    def predict_active(
+        self,
+        model_name: str,
+        inputs: object,
+    ) -> dict[str, object]:
+        """Run inference using the active ready version of a named model."""
+        if not isinstance(model_name, str) or not model_name.strip():
+            raise ValueError("Model name must be a non-empty string.")
+
+        active = self.active_versions.get_active_version(model_name)
+
+        if active is None:
+            raise LookupError(
+                f"No active version configured for model: {model_name}"
+            )
+
+        model_id = active["model_id"]
+        if (
+            isinstance(model_id, bool)
+            or not isinstance(model_id, int)
+            or model_id <= 0
+        ):
+            raise ValueError("Active model selection has an invalid model ID.")
+
+        if active["status"] != "ready":
+            raise ValueError(
+                f"Active model is not ready: {model_id}"
+            )
+
+        return self.predict(model_id, inputs)
 
     def unload_model(self, model_id: int) -> bool:
         """Remove a model's cached instances from this runtime."""

@@ -97,6 +97,18 @@ CREATE INDEX IF NOT EXISTS idx_training_runs_status_started
 
 CREATE INDEX IF NOT EXISTS idx_training_runs_model_id
     ON training_runs (model_id);
+
+CREATE TABLE IF NOT EXISTS active_model_versions (
+    model_name TEXT PRIMARY KEY,
+    model_id INTEGER NOT NULL UNIQUE,
+    activated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (model_id)
+        REFERENCES models (model_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_active_model_versions_model_id
+    ON active_model_versions (model_id);
 """
 
 

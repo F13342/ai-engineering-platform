@@ -87,3 +87,23 @@ class ModelVersionComparisonResponse(BaseModel):
     model_name: str
     version_count: int = Field(ge=0)
     versions: list[ModelVersionResponse]
+
+
+class ActiveModelVersionRequest(BaseModel):
+    """Request to activate a registered model version."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: int = Field(gt=0, strict=True)
+
+
+class ActiveModelVersionResponse(BaseModel):
+    """Public information about the active model version."""
+
+    model_name: str
+    model_id: int
+    version: str
+    status: str
+    activated_at: str
+    metrics: dict[str, Any]
+    parameters: dict[str, Any]
