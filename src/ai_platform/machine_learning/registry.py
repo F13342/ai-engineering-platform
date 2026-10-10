@@ -107,3 +107,47 @@ class ModelRegistryService:
     def get_models(self) -> list[dict[str, object]]:
         """Retrieve metadata for all registered models."""
         return self.repository.get_models()
+
+    def set_model_status(
+        self,
+        model_id: int,
+        status: str,
+    ) -> dict[str, object]:
+        """Enable or disable a model while validating its current state."""
+        if isinstance(model_id, bool) or not isinstance(model_id, int) or model_id <= 0:
+            raise ValueError("model_id must be a positive integer.")
+
+        if status not in {"ready", "disabled"}:
+            raise ValueError("Status must be either 'ready' or 'disabled'.")
+
+        record = self.repository.get_model(model_id)
+        if record is None:
+            raise LookupError(f"Model not found: {model_id}")
+
+        current_status = record["status"]
+        if current_status not in {"ready", "disabled"}:
+            raise ValueError(
+                f"Cannot change a model from status '{current_status}'."
+            )
+
+        if status == "ready":
+            artifact_uri = record["artifact_uri"]
+            if not isinstance(artifact_uri, str) or not artifact_uri:
+                raise ValueError("Model has no artifact URI and cannot be enabled.")
+
+            if not self.artifact_store.exists(artifact_uri):
+                raise ValueError("Model artifact does not exist and cannot be enabled.")
+
+        self.repository.update_model(
+            model_id=model_id,
+            name=record["name"],
+            model_type=record["model_type"],
+            version=record["version"],
+            status=status,
+        )
+
+        updated = self.repository.get_model(model_id)
+        if updated is None:
+            raise RuntimeError(f"Model could not be retrieved after update: {model_id}")
+
+        return updated

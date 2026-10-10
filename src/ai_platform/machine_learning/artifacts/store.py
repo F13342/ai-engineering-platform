@@ -1,4 +1,4 @@
-﻿"""Save and load trusted AI model artifacts."""
+"""Save and load trusted AI model artifacts."""
 
 from pathlib import Path
 
@@ -59,6 +59,11 @@ class ModelArtifactStore:
         joblib.dump(model, destination)
 
         return destination
+
+    def exists(self, artifact_uri: str | Path) -> bool:
+        """Check whether a validly located model artifact exists."""
+        path = self._resolve_path(artifact_uri)
+        return path.is_file()
 
     def load(self, artifact_uri: str | Path) -> object:
         """Load a trusted model artifact from the store."""

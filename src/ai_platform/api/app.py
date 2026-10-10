@@ -2,14 +2,16 @@
 
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi import Depends, FastAPI, HTTPException, Path, Query
 
 from ai_platform.api.schemas import (
     InferenceRequest,
     InferenceResponse,
     ModelMetadataResponse,
+    ModelStatusUpdate,
     TrainingRunResponse,
 )
+from ai_platform.api.security import require_api_key
 from ai_platform.database.repositories.training_run_repository import (
     TrainingRunRepository,
 )
@@ -105,6 +107,38 @@ def create_app(
             raise HTTPException(
                 status_code=500,
                 detail="Model inference failed.",
+            ) from exc
+
+    @app.put(
+        "/v1/models/{model_id}/status",
+        response_model=ModelMetadataResponse,
+        tags=["models"],
+        dependencies=[Depends(require_api_key)],
+    )
+    def update_model_status(
+        request: ModelStatusUpdate,
+        model_id: int = Path(gt=0),
+    ) -> dict[str, object]:
+        """Enable or disable a model using the protected administrative API."""
+        try:
+            return inference_runtime.registry.set_model_status(
+                model_id,
+                request.status,
+            )
+        except LookupError as exc:
+            raise HTTPException(
+                status_code=404,
+                detail=str(exc),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=str(exc),
+            ) from exc
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Model status update failed.",
             ) from exc
 
     @app.get(

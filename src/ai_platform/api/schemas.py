@@ -1,4 +1,4 @@
-﻿"""Request and response schemas for the AI Platform API."""
+"""Request and response schemas for the AI Platform API."""
 
 from typing import Any, Literal
 
@@ -39,6 +39,14 @@ class ModelMetadataResponse(BaseModel):
     metrics: dict[str, Any]
     parameters: dict[str, Any]
     created_at: str
+
+
+class ModelStatusUpdate(BaseModel):
+    """Validated request to enable or disable a registered model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["ready", "disabled"]
 
 
 class TrainingRunResponse(BaseModel):
