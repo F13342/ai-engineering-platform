@@ -1,4 +1,4 @@
-﻿"""Coordinate model metadata and artifact storage."""
+"""Coordinate model metadata and artifact storage."""
 
 from ai_platform.database.repositories.model_repository import ModelRepository
 from ai_platform.machine_learning.artifacts.store import ModelArtifactStore
@@ -102,3 +102,8 @@ class ModelRegistryService:
             )
 
         return self.artifact_store.load(artifact_uri)
+
+
+    def get_models(self) -> list[dict[str, object]]:
+        """Retrieve metadata for all registered models."""
+        return self.repository.get_models()

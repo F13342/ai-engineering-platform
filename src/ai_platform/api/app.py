@@ -1,4 +1,4 @@
-﻿"""HTTP API for the AI Engineering Platform."""
+"""HTTP API for the AI Engineering Platform."""
 
 from typing import Literal
 
@@ -47,6 +47,15 @@ def create_app(
             "status": "ok",
             "service": "ai-engineering-platform",
         }
+
+    @app.get(
+        "/v1/models",
+        response_model=list[ModelMetadataResponse],
+        tags=["models"],
+    )
+    def list_models() -> list[dict[str, object]]:
+        """Return metadata for all registered models."""
+        return inference_runtime.registry.get_models()
 
     @app.get(
         "/v1/models/{model_id}",
