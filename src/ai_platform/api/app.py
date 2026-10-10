@@ -9,6 +9,7 @@ from ai_platform.api.schemas import (
     InferenceResponse,
     ModelMetadataResponse,
     ModelStatusUpdate,
+    ModelVersionComparisonResponse,
     TrainingRunResponse,
 )
 from ai_platform.api.security import require_api_key
@@ -18,11 +19,13 @@ from ai_platform.database.repositories.training_run_repository import (
 from ai_platform.machine_learning.inference.runtime import (
     ModelInferenceRuntime,
 )
+from ai_platform.machine_learning.versions import ModelVersionComparisonService
 
 
 def create_app(
     runtime: ModelInferenceRuntime | None = None,
     training_run_repository: TrainingRunRepository | None = None,
+    version_comparison_service: ModelVersionComparisonService | None = None,
 ) -> FastAPI:
     """Create the API with injectable inference and training dependencies."""
     inference_runtime = (
@@ -32,6 +35,11 @@ def create_app(
         training_run_repository
         if training_run_repository is not None
         else TrainingRunRepository()
+    )
+    version_comparison = (
+        version_comparison_service
+        if version_comparison_service is not None
+        else ModelVersionComparisonService()
     )
 
     app = FastAPI(
@@ -58,6 +66,23 @@ def create_app(
     def list_models() -> list[dict[str, object]]:
         """Return metadata for all registered models."""
         return inference_runtime.registry.get_models()
+
+    @app.get(
+        "/v1/models/by-name/{name}/versions",
+        response_model=ModelVersionComparisonResponse,
+        tags=["models"],
+    )
+    def compare_model_versions(
+        name: str = Path(min_length=1, max_length=200),
+    ) -> dict[str, object]:
+        """Return comparison metadata for all versions sharing a model name."""
+        try:
+            return version_comparison.compare_versions(name)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=str(exc),
+            ) from exc
 
     @app.get(
         "/v1/models/{model_id}",

@@ -65,3 +65,25 @@ class TrainingRunResponse(BaseModel):
     error_message: str | None
     started_at: str
     finished_at: str | None
+
+class ModelVersionResponse(BaseModel):
+    """Public metadata for one registered model version."""
+
+    model_id: int
+    version: str
+    status: str
+    model_type: str
+    provider: str
+    task_type: str
+    framework: str
+    metrics: dict[str, Any]
+    parameters: dict[str, Any]
+    created_at: str
+
+
+class ModelVersionComparisonResponse(BaseModel):
+    """Comparison data for all versions sharing a model name."""
+
+    model_name: str
+    version_count: int = Field(ge=0)
+    versions: list[ModelVersionResponse]

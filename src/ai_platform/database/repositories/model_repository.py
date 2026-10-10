@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 from ai_platform.database.connection import get_connection
 
@@ -115,6 +115,27 @@ class ModelRepository:
         try:
             rows = connection.execute(
                 f"SELECT {MODEL_COLUMNS} FROM models ORDER BY model_id"
+            ).fetchall()
+
+            return [self._to_model(row) for row in rows]
+        finally:
+            connection.close()
+
+    def get_models_by_name(
+        self,
+        name: str,
+    ) -> list[dict[str, object]]:
+        """Retrieve all registered versions sharing an exact model name."""
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Model name must be a non-empty string.")
+
+        connection = get_connection()
+
+        try:
+            rows = connection.execute(
+                f"SELECT {MODEL_COLUMNS} FROM models "
+                "WHERE name = ? ORDER BY model_id",
+                (name,),
             ).fetchall()
 
             return [self._to_model(row) for row in rows]
