@@ -1,11 +1,17 @@
 ﻿"""HTTP API for the AI Engineering Platform."""
 
-from fastapi import FastAPI, HTTPException, Path
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException, Path, Query
 
 from ai_platform.api.schemas import (
     InferenceRequest,
     InferenceResponse,
     ModelMetadataResponse,
+    TrainingRunResponse,
+)
+from ai_platform.database.repositories.training_run_repository import (
+    TrainingRunRepository,
 )
 from ai_platform.machine_learning.inference.runtime import (
     ModelInferenceRuntime,
@@ -14,16 +20,24 @@ from ai_platform.machine_learning.inference.runtime import (
 
 def create_app(
     runtime: ModelInferenceRuntime | None = None,
+    training_run_repository: TrainingRunRepository | None = None,
 ) -> FastAPI:
-    """Create the API application with an injectable inference runtime."""
+    """Create the API with injectable inference and training dependencies."""
     inference_runtime = (
         runtime if runtime is not None else ModelInferenceRuntime()
+    )
+    run_repository = (
+        training_run_repository
+        if training_run_repository is not None
+        else TrainingRunRepository()
     )
 
     app = FastAPI(
         title="AI Engineering Platform API",
         version="0.1.0",
-        description="API for model registry access and inference.",
+        description=(
+            "API for model registry access, inference, and training run tracking."
+        ),
     )
 
     @app.get("/health", tags=["system"])
@@ -83,6 +97,44 @@ def create_app(
                 status_code=500,
                 detail="Model inference failed.",
             ) from exc
+
+    @app.get(
+        "/v1/training-runs",
+        response_model=list[TrainingRunResponse],
+        tags=["training"],
+    )
+    def list_training_runs(
+        status: Literal["running", "completed", "failed"] | None = Query(
+            default=None
+        ),
+        model_id: int | None = Query(default=None, gt=0),
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> list[dict[str, object]]:
+        """List training attempts with optional filters."""
+        return run_repository.get_training_runs(
+            status=status,
+            model_id=model_id,
+            limit=limit,
+        )
+
+    @app.get(
+        "/v1/training-runs/{run_id}",
+        response_model=TrainingRunResponse,
+        tags=["training"],
+    )
+    def get_training_run(
+        run_id: int = Path(gt=0),
+    ) -> dict[str, object]:
+        """Return details for one training attempt."""
+        record = run_repository.get_training_run(run_id)
+
+        if record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Training run not found: {run_id}",
+            )
+
+        return record
 
     return app
 

@@ -1,6 +1,6 @@
 ﻿"""Request and response schemas for the AI Platform API."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,3 +39,21 @@ class ModelMetadataResponse(BaseModel):
     metrics: dict[str, Any]
     parameters: dict[str, Any]
     created_at: str
+
+
+class TrainingRunResponse(BaseModel):
+    """Public representation of a model training attempt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: int
+    model_id: int | None
+    model_name: str
+    model_type: str
+    model_version: str
+    status: Literal["running", "completed", "failed"]
+    metrics: dict[str, Any]
+    parameters: dict[str, Any]
+    error_message: str | None
+    started_at: str
+    finished_at: str | None
