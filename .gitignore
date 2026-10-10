@@ -25,3 +25,6 @@ data/processed/*
 .idea/
 *.egg-info/
 database/ai_platform.db
+
+# Locally stored AI model artifacts
+artifacts/models/

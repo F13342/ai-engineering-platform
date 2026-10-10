@@ -1,4 +1,6 @@
-﻿from ai_platform.database.connection import get_connection
+﻿import sqlite3
+
+from ai_platform.database.connection import get_connection
 
 
 SCHEMA_SQL = """
@@ -62,9 +64,41 @@ CREATE TABLE IF NOT EXISTS models (
     name TEXT NOT NULL,
     model_type TEXT NOT NULL,
     version TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'local',
+    task_type TEXT NOT NULL DEFAULT 'unknown',
+    framework TEXT NOT NULL DEFAULT 'unknown',
+    artifact_uri TEXT,
+    status TEXT NOT NULL DEFAULT 'registered',
+    metrics_json TEXT NOT NULL DEFAULT '{}',
+    parameters_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 """
+
+
+MODEL_REGISTRY_COLUMNS = {
+    "provider": "TEXT NOT NULL DEFAULT 'local'",
+    "task_type": "TEXT NOT NULL DEFAULT 'unknown'",
+    "framework": "TEXT NOT NULL DEFAULT 'unknown'",
+    "artifact_uri": "TEXT",
+    "status": "TEXT NOT NULL DEFAULT 'registered'",
+    "metrics_json": "TEXT NOT NULL DEFAULT '{}'",
+    "parameters_json": "TEXT NOT NULL DEFAULT '{}'",
+}
+
+
+def _migrate_model_registry(connection: sqlite3.Connection) -> None:
+    """Add model registry fields to existing databases without losing data."""
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(models)")
+    }
+
+    for column, definition in MODEL_REGISTRY_COLUMNS.items():
+        if column not in existing_columns:
+            connection.execute(
+                f"ALTER TABLE models ADD COLUMN {column} {definition}"
+            )
 
 
 def initialize_schema() -> None:
@@ -73,6 +107,7 @@ def initialize_schema() -> None:
 
     try:
         connection.executescript(SCHEMA_SQL)
+        _migrate_model_registry(connection)
         connection.commit()
     finally:
         connection.close()
