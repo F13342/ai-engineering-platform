@@ -35,11 +35,71 @@ class FakeRegistry:
         }
 
 
+class FakeRunRepository:
+    def __init__(self):
+        self.runs = {}
+        self.next_id = 1
+
+    def create_training_run(
+        self,
+        *,
+        model_name,
+        model_type,
+        model_version,
+        parameters=None,
+    ):
+        run_id = self.next_id
+        self.next_id += 1
+
+        self.runs[run_id] = {
+            "run_id": run_id,
+            "model_id": None,
+            "model_name": model_name,
+            "model_type": model_type,
+            "model_version": model_version,
+            "status": "running",
+            "metrics": {},
+            "parameters": parameters or {},
+            "error_message": None,
+            "finished_at": None,
+        }
+        return run_id
+
+    def complete_training_run(self, run_id, *, model_id, metrics=None):
+        run = self.runs[run_id]
+        assert run["status"] == "running"
+
+        run.update(
+            status="completed",
+            model_id=model_id,
+            metrics=metrics or {},
+            error_message=None,
+            finished_at="finished",
+        )
+        return run
+
+    def fail_training_run(self, run_id, *, error_message):
+        run = self.runs[run_id]
+        assert run["status"] == "running"
+
+        run.update(
+            status="failed",
+            error_message=error_message,
+            finished_at="finished",
+        )
+        return run
+
+
 def make_service(model=None):
     registry = FakeRegistry()
     estimator = model if model is not None else FakeEstimator()
-    service = ModelTrainingService(registry=registry)
-    return service, registry, estimator
+    runs = FakeRunRepository()
+
+    service = ModelTrainingService(
+        registry=registry,
+        run_repository=runs,
+    )
+    return service, registry, estimator, runs
 
 
 def accuracy(y_true, y_pred):
@@ -50,7 +110,7 @@ def accuracy(y_true, y_pred):
 
 
 def test_trains_evaluates_and_registers_model():
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     result = service.train_and_register(
         model,
@@ -74,12 +134,19 @@ def test_trains_evaluates_and_registers_model():
     assert registry.calls[0]["parameters"] == {"purpose": "platform"}
     assert result["model_id"] == 42
     assert result["status"] == "ready"
+    assert result["training_run_id"] == 1
+
+    run = runs.runs[1]
+    assert run["status"] == "completed"
+    assert run["model_id"] == 42
+    assert run["metrics"] == {"accuracy": 0.5}
+    assert run["error_message"] is None
 
 
 def test_registers_trained_model_without_optional_evaluation():
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
-    service.train_and_register(
+    result = service.train_and_register(
         model,
         [[1], [2]],
         [1, 0],
@@ -91,6 +158,9 @@ def test_registers_trained_model_without_optional_evaluation():
     assert len(registry.calls) == 1
     assert registry.calls[0]["metrics"] == {}
     assert model.predict_calls == []
+    assert result["training_run_id"] == 1
+    assert runs.runs[1]["status"] == "completed"
+    assert runs.runs[1]["metrics"] == {}
 
 
 @pytest.mark.parametrize(
@@ -104,7 +174,7 @@ def test_requires_validation_inputs_as_a_pair(
     validation_features,
     validation_targets,
 ):
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     with pytest.raises(ValueError, match="provided together"):
         service.train_and_register(
@@ -120,10 +190,12 @@ def test_requires_validation_inputs_as_a_pair(
 
     assert registry.calls == []
     assert model.fit_calls == []
+    assert runs.runs[1]["status"] == "failed"
+    assert "provided together" in runs.runs[1]["error_message"]
 
 
 def test_metrics_require_validation_data():
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     with pytest.raises(ValueError, match="required to calculate metrics"):
         service.train_and_register(
@@ -138,10 +210,11 @@ def test_metrics_require_validation_data():
 
     assert registry.calls == []
     assert model.fit_calls == []
+    assert runs.runs[1]["status"] == "failed"
 
 
 def test_validation_data_requires_metrics():
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     with pytest.raises(ValueError, match="at least one metric"):
         service.train_and_register(
@@ -157,10 +230,11 @@ def test_validation_data_requires_metrics():
 
     assert registry.calls == []
     assert model.fit_calls == []
+    assert runs.runs[1]["status"] == "failed"
 
 
 def test_rejects_empty_metric_name():
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     with pytest.raises(ValueError, match="non-empty strings"):
         service.train_and_register(
@@ -176,10 +250,11 @@ def test_rejects_empty_metric_name():
         )
 
     assert registry.calls == []
+    assert runs.runs[1]["status"] == "failed"
 
 
 def test_rejects_non_callable_metric():
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     with pytest.raises(TypeError, match="must be callable"):
         service.train_and_register(
@@ -195,11 +270,15 @@ def test_rejects_non_callable_metric():
         )
 
     assert registry.calls == []
+    assert runs.runs[1]["status"] == "failed"
 
 
-@pytest.mark.parametrize("score", [float("nan"), float("inf"), float("-inf")])
+@pytest.mark.parametrize(
+    "score",
+    [float("nan"), float("inf"), float("-inf")],
+)
 def test_rejects_non_finite_metrics(score):
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     with pytest.raises(ValueError, match="finite"):
         service.train_and_register(
@@ -215,6 +294,7 @@ def test_rejects_non_finite_metrics(score):
         )
 
     assert registry.calls == []
+    assert runs.runs[1]["status"] == "failed"
 
 
 def test_does_not_register_when_training_fails():
@@ -222,7 +302,7 @@ def test_does_not_register_when_training_fails():
         def fit(self, features, targets):
             raise RuntimeError("training failed")
 
-    service, registry, model = make_service(BrokenEstimator())
+    service, registry, model, runs = make_service(BrokenEstimator())
 
     with pytest.raises(RuntimeError, match="training failed"):
         service.train_and_register(
@@ -235,6 +315,8 @@ def test_does_not_register_when_training_fails():
         )
 
     assert registry.calls == []
+    assert runs.runs[1]["status"] == "failed"
+    assert "training failed" in runs.runs[1]["error_message"]
 
 
 def test_does_not_register_when_prediction_fails():
@@ -242,7 +324,7 @@ def test_does_not_register_when_prediction_fails():
         def predict(self, features):
             raise RuntimeError("prediction failed")
 
-    service, registry, model = make_service(BrokenEstimator())
+    service, registry, model, runs = make_service(BrokenEstimator())
 
     with pytest.raises(RuntimeError, match="prediction failed"):
         service.train_and_register(
@@ -258,10 +340,11 @@ def test_does_not_register_when_prediction_fails():
         )
 
     assert registry.calls == []
+    assert runs.runs[1]["status"] == "failed"
 
 
 def test_does_not_register_when_metric_fails():
-    service, registry, model = make_service()
+    service, registry, model, runs = make_service()
 
     def broken_metric(_targets, _predictions):
         raise RuntimeError("metric failed")
@@ -280,6 +363,8 @@ def test_does_not_register_when_metric_fails():
         )
 
     assert registry.calls == []
+    assert runs.runs[1]["status"] == "failed"
+    assert "metric failed" in runs.runs[1]["error_message"]
 
 
 def test_adapter_preserves_model_when_fit_returns_none():

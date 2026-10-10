@@ -1,8 +1,11 @@
-﻿"""Reusable model training and registration service."""
+﻿"""Reusable model training, evaluation, and run tracking service."""
 
 from collections.abc import Mapping
 from typing import Protocol
 
+from ai_platform.database.repositories.training_run_repository import (
+    TrainingRunRepository,
+)
 from ai_platform.machine_learning.evaluation import (
     MetricFunction,
     ModelEvaluationService,
@@ -46,13 +49,14 @@ class EstimatorTrainingAdapter:
 
 
 class ModelTrainingService:
-    """Train, evaluate, and register models in the existing platform."""
+    """Train, evaluate, register, and track model training runs."""
 
     def __init__(
         self,
         registry: ModelRegistryService | None = None,
         adapter: TrainingAdapter | None = None,
         evaluator: ModelEvaluationService | None = None,
+        run_repository: TrainingRunRepository | None = None,
     ) -> None:
         self.registry = (
             registry if registry is not None else ModelRegistryService()
@@ -62,6 +66,11 @@ class ModelTrainingService:
         )
         self.evaluator = (
             evaluator if evaluator is not None else ModelEvaluationService()
+        )
+        self.run_repository = (
+            run_repository
+            if run_repository is not None
+            else TrainingRunRepository()
         )
 
     def train_and_register(
@@ -81,58 +90,102 @@ class ModelTrainingService:
         metrics: Mapping[str, MetricFunction] | None = None,
         parameters: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """Train, optionally evaluate, then register a model.
-
-        Validation data must be provided as a pair. Metrics require validation
-        data. Registration occurs only after training and requested evaluation
-        complete successfully.
-        """
-        metric_functions = self.evaluator.validate_metrics(metrics)
-
-        has_validation_features = validation_features is not None
-        has_validation_targets = validation_targets is not None
-
-        if has_validation_features != has_validation_targets:
-            raise ValueError(
-                "Validation features and targets must be provided together."
-            )
-
-        has_validation_data = (
-            has_validation_features and has_validation_targets
-        )
-
-        if metric_functions and not has_validation_data:
-            raise ValueError(
-                "Validation features and targets are required to calculate metrics."
-            )
-
-        if has_validation_data and not metric_functions:
-            raise ValueError(
-                "Provide at least one metric when validation data is supplied."
-            )
-
-        trained_model = self.adapter.fit(model, features, targets)
-        calculated_metrics: dict[str, float] = {}
-
-        if metric_functions:
-            predictions = self.adapter.predict(
-                trained_model,
-                validation_features,
-            )
-            calculated_metrics = self.evaluator.evaluate(
-                targets=validation_targets,
-                predictions=predictions,
-                metrics=metric_functions,
-            )
-
-        return self.registry.register_model(
-            trained_model,
-            name=name,
+        """Track a training attempt from creation through its final state."""
+        run_id = self.run_repository.create_training_run(
+            model_name=name,
             model_type=model_type,
-            version=version,
-            provider=provider,
-            task_type=task_type,
-            framework=framework,
-            metrics=calculated_metrics,
+            model_version=version,
             parameters=parameters,
         )
+
+        try:
+            metric_functions = self.evaluator.validate_metrics(metrics)
+
+            has_validation_features = validation_features is not None
+            has_validation_targets = validation_targets is not None
+
+            if has_validation_features != has_validation_targets:
+                raise ValueError(
+                    "Validation features and targets must be provided together."
+                )
+
+            has_validation_data = (
+                has_validation_features and has_validation_targets
+            )
+
+            if metric_functions and not has_validation_data:
+                raise ValueError(
+                    "Validation features and targets are required "
+                    "to calculate metrics."
+                )
+
+            if has_validation_data and not metric_functions:
+                raise ValueError(
+                    "Provide at least one metric when validation data is supplied."
+                )
+
+            trained_model = self.adapter.fit(model, features, targets)
+            calculated_metrics: dict[str, float] = {}
+
+            if metric_functions:
+                predictions = self.adapter.predict(
+                    trained_model,
+                    validation_features,
+                )
+                calculated_metrics = self.evaluator.evaluate(
+                    targets=validation_targets,
+                    predictions=predictions,
+                    metrics=metric_functions,
+                )
+
+            registered_model = self.registry.register_model(
+                trained_model,
+                name=name,
+                model_type=model_type,
+                version=version,
+                provider=provider,
+                task_type=task_type,
+                framework=framework,
+                metrics=calculated_metrics,
+                parameters=parameters,
+            )
+
+            if not isinstance(registered_model, dict):
+                raise TypeError(
+                    "Model registry must return a model metadata dictionary."
+                )
+
+            model_id = registered_model.get("model_id")
+
+            if (
+                isinstance(model_id, bool)
+                or not isinstance(model_id, int)
+                or model_id <= 0
+            ):
+                raise ValueError(
+                    "Model registry returned an invalid model ID."
+                )
+
+        except Exception as exc:
+            error_message = f"{type(exc).__name__}: {exc}".strip()
+
+            try:
+                self.run_repository.fail_training_run(
+                    run_id,
+                    error_message=error_message,
+                )
+            except Exception as tracking_error:
+                raise RuntimeError(
+                    f"Training failed ({error_message}), and training run "
+                    f"{run_id} could not be marked failed: {tracking_error}"
+                ) from exc
+
+            raise
+
+        self.run_repository.complete_training_run(
+            run_id,
+            model_id=model_id,
+            metrics=calculated_metrics,
+        )
+
+        return {**registered_model, "training_run_id": run_id}

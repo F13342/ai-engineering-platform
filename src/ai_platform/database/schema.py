@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 
 from ai_platform.database.connection import get_connection
 
@@ -73,6 +73,30 @@ CREATE TABLE IF NOT EXISTS models (
     parameters_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS training_runs (
+    run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_id INTEGER,
+    model_name TEXT NOT NULL,
+    model_type TEXT NOT NULL,
+    model_version TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'completed', 'failed')),
+    metrics_json TEXT NOT NULL DEFAULT '{}',
+    parameters_json TEXT NOT NULL DEFAULT '{}',
+    error_message TEXT,
+    started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TEXT,
+    FOREIGN KEY (model_id)
+        REFERENCES models (model_id)
+        ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_training_runs_status_started
+    ON training_runs (status, started_at);
+
+CREATE INDEX IF NOT EXISTS idx_training_runs_model_id
+    ON training_runs (model_id);
 """
 
 
