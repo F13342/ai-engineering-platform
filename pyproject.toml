@@ -22,6 +22,9 @@ dependencies = [
 dev = [
     "pytest==9.1.1"
 ]
+ml = [
+    "torch"
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
