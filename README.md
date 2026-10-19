@@ -198,6 +198,71 @@ Project added: My Project
 
 ---
 
+## Language Model CLI
+
+The `ai-platform` command supports project management and local language-model workflows.
+
+### Installation
+
+Install the project with its optional PyTorch dependency:
+
+~~~bash
+python -m pip install -e ".[ml]"
+~~~
+
+Display the available commands:
+
+~~~bash
+ai-platform --help
+~~~
+
+### Train a Language Model
+
+Prepare a UTF-8 training corpus:
+
+~~~bash
+ai-platform train --corpus data/raw/train.txt --output-dir runs/experiment --tokenizer-type bpe --tokenizer-vocab-size 512 --max-steps 1000 --device auto
+~~~
+
+Training starts with randomly initialized weights and does not download a pretrained model. The trainer splits the corpus according to `--train-fraction`.
+
+Important options include `--batch-size`, `--block-size`, `--eval-interval`, `--tokenizer-type`, and `--device`.
+
+### Resume Training
+
+~~~bash
+ai-platform train --corpus data/raw/train.txt --output-dir runs/experiment --resume-from runs/experiment/last.pt --max-steps 2000 --tokenizer-type bpe --tokenizer-vocab-size 512 --device auto
+~~~
+
+`--max-steps` is the target total number of steps, not the number of additional steps. Resuming requires the same corpus and output directory, together with compatible model settings.
+
+### Evaluate a Checkpoint
+
+Use held-out evaluation text:
+
+~~~bash
+ai-platform evaluate --checkpoint runs/experiment/best.pt --text-file data/raw/validation.txt --device auto
+~~~
+
+The output includes evaluation metrics such as bits per character.
+
+### Generate Text
+
+~~~bash
+ai-platform generate --checkpoint runs/experiment/best.pt --prompt "Once upon a time" --max-new-tokens 100 --temperature 0.8 --device auto
+~~~
+
+The optional `--top-k` argument limits candidate tokens during generation.
+
+### Training Artifacts
+
+- `best.pt`: checkpoint with the best validation loss.
+- `last.pt`: latest checkpoint, including state needed for resuming.
+- `tokenizer.json`: tokenizer metadata and vocabulary or merge information.
+- `metrics.json`: training and validation history.
+
+These commands use the local implementation without an external AI API. Output quality depends on the corpus, configuration, and training duration; successful execution does not imply general-purpose conversational ability.
+
 # Testing
 
 The project uses Pytest for automated testing.
@@ -208,11 +273,7 @@ Run all tests:
 python -m pytest -q
 ```
 
-The current complete test suite contains:
-
-```text
-27 passed
-```
+The test suite covers CLI, API, data engineering, tokenizers, model training, evaluation, and resumable training. Run PyTorch-dependent tests in an environment with PyTorch installed.
 
 The tests cover:
 
