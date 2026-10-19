@@ -18,6 +18,9 @@ dependencies = [
     "httpx==0.28.1",
 ]
 
+[project.scripts]
+ai-platform = "ai_platform.cli.main:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1"
