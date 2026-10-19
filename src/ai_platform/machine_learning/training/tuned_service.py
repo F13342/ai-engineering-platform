@@ -185,6 +185,7 @@ class TunedModelTrainingService:
                 "best_params": _json_safe(tuning_result.best_params),
                 "best_cv_score": tuning_result.best_score,
                 "candidates_evaluated": tuning_result.candidates_evaluated,
+                "leaderboard": _json_safe(tuning_result.leaderboard),
             }
 
             registered_parameters = dict(parameters or {})

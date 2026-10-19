@@ -161,6 +161,18 @@ def test_tabular_tuning_registration_reload_and_inference(
         == result["optimization"]["candidates_evaluated"]
     )
 
+    saved_leaderboard = saved_optimization["leaderboard"]
+    assert saved_leaderboard == result["optimization"]["leaderboard"]
+    assert len(saved_leaderboard) == saved_optimization["candidates_evaluated"]
+
+    ranks = [entry["rank"] for entry in saved_leaderboard]
+    assert ranks[0] == 1
+    assert ranks == sorted(ranks)
+    assert all(
+        "params" in entry and "mean_test_score" in entry
+        for entry in saved_leaderboard
+    )
+
     # Assert: model metadata and serialized artifact survive a reload.
     registered_record = registry.get_model(model_id)
     assert registered_record is not None
