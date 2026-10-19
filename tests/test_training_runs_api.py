@@ -16,7 +16,30 @@ class FakeTrainingRunRepository:
                 "model_version": "1.0.0",
                 "status": "completed",
                 "metrics": {"accuracy": 0.95},
-                "parameters": {"purpose": "platform"},
+                "parameters": {
+                    "purpose": "platform",
+                    "optimization": {
+                        "best_params": {"model__alpha": 0.1},
+                        "best_cv_score": -0.12,
+                        "candidates_evaluated": 2,
+                        "leaderboard": [
+                            {
+                                "rank": 1,
+                                "params": {"model__alpha": 0.1},
+                                "mean_test_score": -0.12,
+                                "std_test_score": 0.01,
+                                "mean_fit_time": 0.001,
+                            },
+                            {
+                                "rank": 2,
+                                "params": {"model__alpha": 1.0},
+                                "mean_test_score": -0.2,
+                                "std_test_score": 0.02,
+                                "mean_fit_time": 0.001,
+                            },
+                        ],
+                    },
+                },
                 "error_message": None,
                 "started_at": "2026-10-10 10:00:00",
                 "finished_at": "2026-10-10 10:01:00",
@@ -197,7 +220,14 @@ def test_get_training_run_returns_details():
     assert data["run_id"] == 1
     assert data["status"] == "completed"
     assert data["metrics"] == {"accuracy": 0.95}
-    assert data["parameters"] == {"purpose": "platform"}
+    assert data["parameters"]["purpose"] == "platform"
+
+    optimization = data["parameters"]["optimization"]
+    assert optimization["best_params"] == {"model__alpha": 0.1}
+    assert optimization["candidates_evaluated"] == 2
+    assert len(optimization["leaderboard"]) == 2
+    assert optimization["leaderboard"][0]["rank"] == 1
+    assert optimization["leaderboard"][0]["mean_test_score"] == -0.12
 
 
 def test_get_training_run_returns_404_for_unknown_id():
