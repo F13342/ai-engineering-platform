@@ -53,12 +53,17 @@ class FakeRunRepository:
         }
         return run_id
 
-    def complete_training_run(self, run_id, *, model_id, metrics=None):
+    def complete_training_run(
+        self, run_id, *, model_id, metrics=None, parameters=None
+    ):
         run = self.runs[run_id]
         run.update(
             status="completed",
             model_id=model_id,
             metrics=metrics or {},
+            parameters=(
+                run["parameters"] if parameters is None else parameters
+            ),
             finished_at="finished",
         )
         return run
@@ -128,6 +133,10 @@ def test_tunes_evaluates_registers_and_tracks_model():
     assert runs.runs[1]["status"] == "completed"
     assert runs.runs[1]["model_id"] == 71
     assert runs.runs[1]["metrics"]["mae"] < 1e-6
+    saved_optimization = runs.runs[1]["parameters"]["optimization"]
+    assert saved_optimization["best_params"]
+    assert np.isfinite(saved_optimization["best_cv_score"])
+    assert saved_optimization["candidates_evaluated"] == 2
 
 
 def test_failed_search_marks_training_run_failed():

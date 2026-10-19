@@ -188,6 +188,7 @@ class TrainingRunRepository:
         *,
         model_id: int,
         metrics: dict[str, object] | None = None,
+        parameters: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """Mark a running attempt completed and link its registered model."""
         self._validate_run_id(run_id)
@@ -200,6 +201,9 @@ class TrainingRunRepository:
             raise ValueError("model_id must be a positive integer.")
 
         metrics_json = self._serialize_json(metrics)
+        parameters_json = (
+            None if parameters is None else self._serialize_json(parameters)
+        )
         connection = get_connection()
 
         try:
@@ -209,11 +213,12 @@ class TrainingRunRepository:
                 SET status = 'completed',
                     model_id = ?,
                     metrics_json = ?,
+                    parameters_json = COALESCE(?, parameters_json),
                     error_message = NULL,
                     finished_at = CURRENT_TIMESTAMP
                 WHERE run_id = ? AND status = 'running'
                 """,
-                (model_id, metrics_json, run_id),
+                (model_id, metrics_json, parameters_json, run_id),
             )
 
             if cursor.rowcount == 0:

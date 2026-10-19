@@ -233,6 +233,7 @@ class TunedModelTrainingService:
             run_id,
             model_id=model_id,
             metrics=calculated_metrics,
+            parameters=_json_safe(registered_parameters),
         )
 
         return {

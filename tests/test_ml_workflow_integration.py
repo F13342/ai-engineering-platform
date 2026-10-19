@@ -1,4 +1,5 @@
-﻿import sqlite3
+﻿import json
+import sqlite3
 from pathlib import Path
 
 import numpy as np
@@ -114,6 +115,7 @@ def test_tabular_tuning_registration_reload_and_inference(
         validation_features=validation_features,
         validation_targets=validation_targets,
         metrics={"mae": mean_absolute_error},
+        parameters={"purpose": "integration-test"},
     )
 
     # Assert: tuning and validation produced usable results.
@@ -132,7 +134,7 @@ def test_tabular_tuning_registration_reload_and_inference(
     with sqlite3.connect(isolated_database) as connection:
         run_row = connection.execute(
             """
-            SELECT status, model_id, metrics_json
+            SELECT status, model_id, metrics_json, parameters_json
             FROM training_runs
             WHERE run_id = ?
             """,
@@ -142,6 +144,22 @@ def test_tabular_tuning_registration_reload_and_inference(
     assert run_row is not None
     assert run_row[0] == "completed"
     assert run_row[1] == model_id
+    saved_parameters = json.loads(run_row[3])
+    assert saved_parameters["purpose"] == "integration-test"
+
+    saved_optimization = saved_parameters["optimization"]
+    assert (
+        saved_optimization["best_params"]
+        == result["optimization"]["best_params"]
+    )
+    assert np.isclose(
+        saved_optimization["best_cv_score"],
+        result["optimization"]["best_cv_score"],
+    )
+    assert (
+        saved_optimization["candidates_evaluated"]
+        == result["optimization"]["candidates_evaluated"]
+    )
 
     # Assert: model metadata and serialized artifact survive a reload.
     registered_record = registry.get_model(model_id)
