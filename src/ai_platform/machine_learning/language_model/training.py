@@ -11,6 +11,7 @@ from typing import Any
 import torch
 from torch import Tensor
 
+from .bpe_tokenizer import BPETokenizer
 from .model import TinyTransformerLM, TransformerConfig
 from .tokenizer import CharacterTokenizer
 
@@ -33,6 +34,9 @@ class LanguageModelTrainingConfig:
     train_fraction: float = 0.9
     grad_clip: float = 1.0
     seed: int = 42
+    tokenizer_type: str = "character"
+    tokenizer_vocab_size: int = 512
+    tokenizer_min_frequency: int = 2
     device: str = "auto"
 
     def __post_init__(self) -> None:
@@ -54,6 +58,12 @@ class LanguageModelTrainingConfig:
             raise ValueError("Evaluation settings must be positive.")
         if not 0.0 < self.train_fraction < 1.0:
             raise ValueError("train_fraction must be between 0 and 1.")
+        if self.tokenizer_type not in {"character", "bpe"}:
+            raise ValueError("tokenizer_type must be character or bpe.")
+        if self.tokenizer_vocab_size < 1:
+            raise ValueError("tokenizer_vocab_size must be positive.")
+        if self.tokenizer_min_frequency < 1:
+            raise ValueError("tokenizer_min_frequency must be positive.")
         if self.device not in {"auto", "cpu", "cuda", "mps"}:
             raise ValueError("device must be auto, cpu, cuda, or mps.")
 
@@ -128,7 +138,14 @@ def train_language_model(
     if not text.strip():
         raise ValueError("The training corpus cannot be empty or whitespace-only.")
 
-    tokenizer = CharacterTokenizer.fit(text)
+    if config.tokenizer_type == "character":
+        tokenizer = CharacterTokenizer.fit(text)
+    else:
+        tokenizer = BPETokenizer.fit(
+            text,
+            vocab_size=config.tokenizer_vocab_size,
+            min_frequency=config.tokenizer_min_frequency,
+        )
     token_ids = torch.tensor(tokenizer.encode(text), dtype=torch.long)
     split_at = int(token_ids.numel() * config.train_fraction)
     train_data = token_ids[:split_at]
@@ -255,7 +272,18 @@ def load_language_model(
 
     model_config = TransformerConfig(**checkpoint["model_config"])
     tokenizer_path = checkpoint_path.parent / "tokenizer.json"
-    tokenizer = CharacterTokenizer.load(tokenizer_path)
+    tokenizer_metadata = json.loads(
+        tokenizer_path.read_text(encoding="utf-8")
+    )
+    tokenizer_kind = tokenizer_metadata.get("tokenizer_type")
+    if tokenizer_kind == "character":
+        tokenizer = CharacterTokenizer.load(tokenizer_path)
+    elif tokenizer_kind == "bpe_char":
+        tokenizer = BPETokenizer.load(tokenizer_path)
+    else:
+        raise ValueError(
+            f"Unsupported tokenizer type in checkpoint: {tokenizer_kind!r}"
+        )
 
     if tokenizer.vocab_size != model_config.vocab_size:
         raise ValueError("Checkpoint and tokenizer vocabulary sizes do not match.")

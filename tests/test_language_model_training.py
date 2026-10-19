@@ -74,3 +74,56 @@ def test_training_rejects_missing_corpus(tmp_path):
     )
     with pytest.raises(FileNotFoundError, match="Corpus file not found"):
         train_language_model(tmp_path / "missing.txt", tmp_path / "artifacts", config)
+
+
+def test_bpe_training_saves_reloadable_checkpoint_and_generates_text(tmp_path):
+    corpus = tmp_path / "corpus.txt"
+    corpus.write_text(
+        ("Alice saw the rabbit. Alice followed the rabbit.\n" * 80),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "bpe_artifacts"
+    config = LanguageModelTrainingConfig(
+        block_size=8,
+        n_layers=1,
+        n_heads=2,
+        n_embd=16,
+        dropout=0.0,
+        batch_size=2,
+        max_steps=2,
+        learning_rate=1e-3,
+        eval_interval=1,
+        eval_batches=1,
+        train_fraction=0.8,
+        seed=9,
+        tokenizer_type="bpe",
+        tokenizer_vocab_size=48,
+        tokenizer_min_frequency=2,
+        device="cpu",
+    )
+
+    result = train_language_model(corpus, output_dir, config)
+
+    assert result["steps"] == 2
+    assert (output_dir / "best.pt").is_file()
+    assert (output_dir / "tokenizer.json").is_file()
+
+    tokenizer_json = __import__("json").loads(
+        (output_dir / "tokenizer.json").read_text(encoding="utf-8")
+    )
+    assert tokenizer_json["tokenizer_type"] == "bpe_char"
+
+    model, tokenizer, checkpoint = load_language_model(
+        output_dir / "best.pt", device="cpu"
+    )
+    assert model.training is False
+    assert tokenizer.vocab_size == model.config.vocab_size
+    assert checkpoint["step"] in (1, 2)
+
+    generated = generate_text(
+        output_dir / "best.pt",
+        "Alice",
+        max_new_tokens=3,
+        device="cpu",
+    )
+    assert generated.startswith("Alice")
