@@ -28,3 +28,6 @@ database/ai_platform.db
 
 # Locally stored AI model artifacts
 artifacts/models/
+
+# Local training runs and checkpoints
+runs/

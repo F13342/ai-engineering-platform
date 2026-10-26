@@ -1,0 +1,537 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <title>AI Engineering Platform | المحادثة</title>
+    <style>
+        :root {
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            color: #202633;
+            background: #f4f6fb;
+            font-synthesis: none;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(ellipse at top right, #e4eaff 0, transparent 42%),
+                #f4f6fb;
+        }
+
+        button, input, textarea, select { font: inherit; }
+
+        .shell {
+            width: min(100% - 32px, 980px);
+            margin: 0 auto;
+            padding: 28px 0;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            display: grid;
+            place-items: center;
+            width: 46px;
+            height: 46px;
+            border-radius: 15px;
+            color: white;
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(140deg, #5865ed, #8a59d6);
+            box-shadow: 0 8px 22px #6471d933;
+        }
+
+        h1 { margin: 0; font-size: 19px; }
+        .subtitle { margin: 5px 0 0; color: #737c8e; font-size: 13px; }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            white-space: nowrap;
+            border: 1px solid #dce3ef;
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: #fff;
+            color: #687386;
+            font-size: 12px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9aa4b5;
+        }
+
+        .status.ready .dot { background: #20a56a; }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 255px minmax(0, 1fr);
+            gap: 18px;
+            align-items: stretch;
+        }
+
+        .panel, .chat-card {
+            border: 1px solid #e2e7f0;
+            border-radius: 20px;
+            background: rgba(255,255,255,.94);
+            box-shadow: 0 12px 35px #2638580a;
+        }
+
+        .panel { padding: 20px; }
+
+        .section-title {
+            margin: 0 0 18px;
+            font-size: 15px;
+        }
+
+        .field { margin-bottom: 18px; }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid #dce2ed;
+            border-radius: 11px;
+            padding: 11px 12px;
+            color: #202633;
+            background: white;
+            outline: none;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: #6975e9;
+            box-shadow: 0 0 0 3px #6975e91b;
+        }
+
+        input[type="password"] { direction: ltr; text-align: left; }
+
+        .hint {
+            margin: 7px 0 0;
+            color: #7b8495;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .key-note {
+            padding: 11px;
+            border-radius: 11px;
+            color: #56627a;
+            background: #f1f4ff;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+
+        .chat-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 640px;
+            overflow: hidden;
+        }
+
+        .chat-head {
+            padding: 17px 20px;
+            border-bottom: 1px solid #edf0f6;
+        }
+
+        .chat-head strong { font-size: 14px; }
+        .chat-head p { margin: 5px 0 0; color: #81899a; font-size: 12px; }
+
+        .messages {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            gap: 17px;
+            overflow-y: auto;
+            max-height: 470px;
+            padding: 24px 20px;
+        }
+
+        .message { max-width: 88%; }
+
+        .message.user { align-self: flex-start; }
+        .message.assistant { align-self: flex-end; }
+
+        .message-label {
+            margin-bottom: 6px;
+            color: #747e91;
+            font-size: 11px;
+        }
+
+        .bubble {
+            padding: 12px 15px;
+            border: 1px solid #e6eaf2;
+            border-radius: 15px 15px 4px 15px;
+            background: #f7f8fc;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font-size: 14px;
+            line-height: 1.85;
+        }
+
+        .message.user .bubble {
+            color: white;
+            background: #5a67dc;
+            border-color: #5a67dc;
+            border-radius: 15px 15px 15px 4px;
+        }
+
+        .message-meta {
+            margin-top: 6px;
+            color: #848c9c;
+            font-size: 11px;
+        }
+
+        .composer {
+            border-top: 1px solid #edf0f6;
+            padding: 16px;
+        }
+
+        .composer textarea {
+            resize: vertical;
+            min-height: 76px;
+            max-height: 180px;
+            line-height: 1.7;
+        }
+
+        .composer-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .small-hint { color: #838b9b; font-size: 11px; }
+
+        .primary {
+            border: 0;
+            border-radius: 11px;
+            padding: 11px 19px;
+            color: white;
+            background: #5865dd;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .primary:hover { background: #4755cf; }
+        .primary:disabled { opacity: .55; cursor: wait; }
+
+        .notice {
+            min-height: 20px;
+            margin-top: 10px;
+            color: #64718a;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .notice.error { color: #bc3547; }
+
+        footer {
+            margin-top: 17px;
+            text-align: center;
+            color: #8a92a1;
+            font-size: 11px;
+            line-height: 1.8;
+        }
+
+        @media (max-width: 740px) {
+            .shell { width: min(100% - 20px, 600px); padding-top: 16px; }
+            .topbar { align-items: flex-start; }
+            .status { font-size: 11px; padding: 7px 9px; }
+            .layout { grid-template-columns: 1fr; }
+            .panel { padding: 16px; }
+            .chat-card { min-height: 530px; }
+            .messages { max-height: 360px; }
+            .message { max-width: 96%; }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="logo" aria-hidden="true">AI</div>
+                <div>
+                    <h1>منصة هندسة الذكاء الاصطناعي</h1>
+                    <p class="subtitle">واجهة محادثة للنموذج المحلي</p>
+                </div>
+            </div>
+            <div id="status" class="status">
+                <span class="dot"></span>
+                <span id="statusText">بانتظار الاتصال</span>
+            </div>
+        </header>
+
+        <div class="layout">
+            <aside class="panel">
+                <h2 class="section-title">إعدادات المحادثة</h2>
+
+                <div class="field">
+                    <label for="apiKey">مفتاح API</label>
+                    <input
+                        id="apiKey"
+                        type="password"
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="أدخل مفتاح الخادم"
+                        aria-describedby="keyHint"
+                    >
+                    <p id="keyHint" class="hint">
+                        استخدم قيمة AI_PLATFORM_API_KEY المضبوطة على الخادم.
+                    </p>
+                </div>
+
+                <div class="key-note">
+                    المفتاح لا يُحفظ في التخزين المحلي أو في ملف دائم.
+                    أدخله فقط في بيئة موثوقة تشغّل خادمك.
+                </div>
+
+                <div class="field" style="margin-top:22px">
+                    <label for="maxTokens">أقصى عدد للرموز الجديدة</label>
+                    <select id="maxTokens">
+                        <option value="32">32 — رد قصير</option>
+                        <option value="64">64</option>
+                        <option value="100" selected>100 — افتراضي</option>
+                        <option value="200">200</option>
+                        <option value="512">512 — رد أطول</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="temperature">درجة الحرارة</label>
+                    <select id="temperature">
+                        <option value="0.3">0.3 — أكثر تحفظًا</option>
+                        <option value="0.7">0.7</option>
+                        <option value="1.0" selected>1.0 — افتراضي</option>
+                        <option value="1.3">1.3 — أكثر تنوعًا</option>
+                        <option value="2.0">2.0</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="topK">Top-k (اختياري)</label>
+                    <select id="topK">
+                        <option value="">بدون تحديد</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="40">40</option>
+                    </select>
+                </div>
+            </aside>
+
+            <section class="chat-card" aria-label="محادثة النموذج">
+                <header class="chat-head">
+                    <strong>المحادثة</strong>
+                    <p>تُرسل الرسائل إلى واجهة API الخاصة بمشروعك.</p>
+                </header>
+
+                <div id="messages" class="messages" role="log" aria-live="polite">
+                    <article class="message assistant">
+                        <div class="message-label">مساعد المنصة</div>
+                        <div class="bubble">مرحبًا! أدخل مفتاح API من الإعدادات، ثم اكتب رسالتك لبدء التجربة.</div>
+                    </article>
+                </div>
+
+                <div class="composer">
+                    <label for="prompt">رسالتك</label>
+                    <textarea
+                        id="prompt"
+                        maxlength="4000"
+                        placeholder="اكتب رسالتك هنا..."
+                    ></textarea>
+                    <div class="composer-bottom">
+                        <span class="small-hint">Enter للإرسال · Shift + Enter لسطر جديد</span>
+                        <button id="sendButton" class="primary" type="button">
+                            إرسال الرسالة
+                        </button>
+                    </div>
+                    <div id="notice" class="notice" role="status"></div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            الواجهة تستخدم نموذج المشروع المحلي. جودة الإجابات تعتمد على النموذج وبيانات تدريبه.
+        </footer>
+    </main>
+
+    <script>
+        "use strict";
+
+        const apiKeyInput = document.getElementById("apiKey");
+        const promptInput = document.getElementById("prompt");
+        const sendButton = document.getElementById("sendButton");
+        const messages = document.getElementById("messages");
+        const notice = document.getElementById("notice");
+        const status = document.getElementById("status");
+        const statusText = document.getElementById("statusText");
+
+        function setNotice(message, isError = false) {
+            notice.textContent = message;
+            notice.classList.toggle("error", isError);
+        }
+
+        function addMessage(role, text, meta = "") {
+            const article = document.createElement("article");
+            article.className = "message " + role;
+
+            const label = document.createElement("div");
+            label.className = "message-label";
+            label.textContent = role === "user" ? "أنت" : "النموذج";
+
+            const bubble = document.createElement("div");
+            bubble.className = "bubble";
+            // textContent prevents generated text from being interpreted as HTML.
+            bubble.textContent = text;
+
+            article.appendChild(label);
+            article.appendChild(bubble);
+
+            if (meta) {
+                const metadata = document.createElement("div");
+                metadata.className = "message-meta";
+                metadata.textContent = meta;
+                article.appendChild(metadata);
+            }
+
+            messages.appendChild(article);
+            messages.scrollTop = messages.scrollHeight;
+            return article;
+        }
+
+        async function sendMessage() {
+            const prompt = promptInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!apiKey) {
+                setNotice("أدخل مفتاح API أولًا.", true);
+                apiKeyInput.focus();
+                return;
+            }
+
+            if (!prompt) {
+                setNotice("اكتب رسالة قبل الإرسال.", true);
+                promptInput.focus();
+                return;
+            }
+
+            if (prompt.length > 4000) {
+                setNotice("الرسالة أطول من الحد المسموح به.", true);
+                return;
+            }
+
+            const payload = {
+                prompt,
+                max_new_tokens: Number(document.getElementById("maxTokens").value),
+                temperature: Number(document.getElementById("temperature").value)
+            };
+
+            const topK = document.getElementById("topK").value;
+            if (topK) payload.top_k = Number(topK);
+
+            addMessage("user", prompt);
+            promptInput.value = "";
+            sendButton.disabled = true;
+            status.classList.remove("ready");
+            statusText.textContent = "جارٍ التوليد...";
+            setNotice("يجري إرسال الطلب إلى النموذج المحلي...");
+
+            try {
+                const response = await fetch("/v1/language-model/generate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-API-Key": apiKey
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    data = {};
+                }
+
+                if (!response.ok) {
+                    const details = data.detail || "حدث خطأ أثناء الاتصال بالخادم.";
+
+                    if (response.status === 401) {
+                        throw new Error("مفتاح API غير صحيح أو غير موجود.");
+                    }
+                    if (response.status === 503) {
+                        throw new Error(
+                            typeof details === "string"
+                                ? details
+                                : "خدمة النموذج غير جاهزة. تحقق من إعدادات الخادم."
+                        );
+                    }
+
+                    throw new Error(
+                        typeof details === "string"
+                            ? details
+                            : JSON.stringify(details)
+                    );
+                }
+
+                addMessage(
+                    "assistant",
+                    data.text,
+                    "زمن التوليد: " +
+                        Number(data.generation_latency_ms).toFixed(1) +
+                        " مللي ثانية"
+                );
+
+                status.classList.add("ready");
+                statusText.textContent = "اكتمل الرد";
+                setNotice("تم توليد الرد بنجاح.");
+            } catch (error) {
+                status.classList.remove("ready");
+                statusText.textContent = "تعذر إكمال الطلب";
+                setNotice(
+                    error instanceof Error ? error.message : "حدث خطأ غير متوقع.",
+                    true
+                );
+            } finally {
+                sendButton.disabled = false;
+                promptInput.focus();
+            }
+        }
+
+        sendButton.addEventListener("click", sendMessage);
+
+        promptInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

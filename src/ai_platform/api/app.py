@@ -5,6 +5,8 @@ from time import perf_counter
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query
+from fastapi.responses import FileResponse
+from pathlib import Path as FilePath
 
 from ai_platform.api.schemas import (
     InferenceRequest,
@@ -355,6 +357,26 @@ def create_app(
                 (perf_counter() - started_at) * 1000, 3
             ),
         }
+
+
+    @app.get(
+        "/chat",
+        response_class=FileResponse,
+        include_in_schema=False,
+    )
+    def chat_page() -> FileResponse:
+        """Serve the local chat interface."""
+        page_path = FilePath(__file__).with_name("chat.html")
+        if not page_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail="Chat page not found.",
+            )
+        return FileResponse(
+            path=page_path,
+            media_type="text/html",
+            headers={"Cache-Control": "no-store"},
+        )
 
     return app
 
