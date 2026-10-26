@@ -1,8 +1,8 @@
-"""Request and response schemas for the AI Platform API."""
+﻿"""Request and response schemas for the AI Platform API."""
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class InferenceRequest(BaseModel):
@@ -107,3 +107,28 @@ class ActiveModelVersionResponse(BaseModel):
     activated_at: str
     metrics: dict[str, Any]
     parameters: dict[str, Any]
+
+
+class LanguageModelGenerationRequest(BaseModel):
+    """Validated request for local language-model generation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str = Field(min_length=1, max_length=4000)
+    max_new_tokens: int = Field(default=100, ge=1, le=512)
+    temperature: float = Field(default=1.0, gt=0, le=2.0)
+    top_k: int | None = Field(default=None, ge=1)
+
+    @field_validator("prompt")
+    @classmethod
+    def prompt_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("prompt must not be blank")
+        return value
+
+
+class LanguageModelGenerationResponse(BaseModel):
+    """Response containing generated text and elapsed generation time."""
+
+    text: str
+    generation_latency_ms: float = Field(ge=0)

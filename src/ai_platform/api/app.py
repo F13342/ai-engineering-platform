@@ -1,5 +1,7 @@
 """HTTP API for the AI Engineering Platform."""
 
+import os
+from time import perf_counter
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query
@@ -7,6 +9,8 @@ from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from ai_platform.api.schemas import (
     InferenceRequest,
     InferenceResponse,
+    LanguageModelGenerationRequest,
+    LanguageModelGenerationResponse,
     ActiveModelVersionRequest,
     ActiveModelVersionResponse,
     ModelMetadataResponse,
@@ -15,6 +19,9 @@ from ai_platform.api.schemas import (
     TrainingRunResponse,
 )
 from ai_platform.api.security import require_api_key
+from ai_platform.machine_learning.language_model.generation import (
+    LanguageModelGenerationService,
+)
 from ai_platform.database.repositories.training_run_repository import (
     TrainingRunRepository,
 )
@@ -32,6 +39,7 @@ def create_app(
     training_run_repository: TrainingRunRepository | None = None,
     version_comparison_service: ModelVersionComparisonService | None = None,
     active_version_service: ActiveModelVersionService | None = None,
+    language_model_generation_service: LanguageModelGenerationService | None = None,
 ) -> FastAPI:
     """Create the API with injectable inference and training dependencies."""
     active_versions = active_version_service
@@ -55,6 +63,17 @@ def create_app(
         if version_comparison_service is not None
         else ModelVersionComparisonService()
     )
+
+    generation_service = language_model_generation_service
+    if generation_service is None:
+        checkpoint_path = os.environ.get(
+            "AI_PLATFORM_LANGUAGE_MODEL_CHECKPOINT"
+        )
+        if checkpoint_path:
+            generation_service = LanguageModelGenerationService(
+                checkpoint_path,
+                device=os.environ.get("AI_PLATFORM_LANGUAGE_MODEL_DEVICE", "auto"),
+            )
 
     app = FastAPI(
         title="AI Engineering Platform API",
@@ -290,6 +309,52 @@ def create_app(
             )
 
         return record
+
+
+    @app.post(
+        "/v1/language-model/generate",
+        response_model=LanguageModelGenerationResponse,
+        tags=["language-model"],
+        dependencies=[Depends(require_api_key)],
+    )
+    def generate_language_model(
+        request: LanguageModelGenerationRequest,
+    ) -> dict[str, object]:
+        """Generate text with the configured local language model."""
+        if generation_service is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Language model generation is not configured. Set "
+                    "AI_PLATFORM_LANGUAGE_MODEL_CHECKPOINT."
+                ),
+            )
+
+        started_at = perf_counter()
+        try:
+            generated_text = generation_service.generate(
+                prompt=request.prompt,
+                max_new_tokens=request.max_new_tokens,
+                temperature=request.temperature,
+                top_k=request.top_k,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="The configured language model checkpoint is unavailable.",
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Language model generation failed.",
+            ) from exc
+
+        return {
+            "text": generated_text,
+            "generation_latency_ms": round(
+                (perf_counter() - started_at) * 1000, 3
+            ),
+        }
 
     return app
 
