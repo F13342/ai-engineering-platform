@@ -159,6 +159,22 @@
             border-bottom: 1px solid #edf0f6;
         }
 
+        .chat-head-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .secondary {
+            padding: 8px 11px;
+            border: 1px solid #dce2ed;
+            border-radius: 10px;
+            color: #5865b8;
+            background: white;
+            cursor: pointer;
+        }
+
         .chat-head strong { font-size: 14px; }
         .chat-head p { margin: 5px 0 0; color: #81899a; font-size: 12px; }
 
@@ -347,8 +363,15 @@
 
             <section class="chat-card" aria-label="محادثة النموذج">
                 <header class="chat-head">
-                    <strong>المحادثة</strong>
-                    <p>تُرسل الرسائل إلى واجهة API الخاصة بمشروعك.</p>
+                    <div class="chat-head-row">
+                        <div>
+                            <strong>المحادثة</strong>
+                            <p>تُرسل الرسائل إلى واجهة API الخاصة بمشروعك.</p>
+                        </div>
+                        <button id="clearChatButton" class="secondary" type="button">
+                            مسح المحادثة
+                        </button>
+                    </div>
                 </header>
 
                 <div id="messages" class="messages" role="log" aria-live="polite">
@@ -387,6 +410,7 @@
         const apiKeyInput = document.getElementById("apiKey");
         const promptInput = document.getElementById("prompt");
         const sendButton = document.getElementById("sendButton");
+        const clearChatButton = document.getElementById("clearChatButton");
         const messages = document.getElementById("messages");
         const notice = document.getElementById("notice");
         const status = document.getElementById("status");
@@ -525,6 +549,18 @@
         }
 
         sendButton.addEventListener("click", sendMessage);
+
+        clearChatButton.addEventListener("click", () => {
+            messages.replaceChildren();
+            addMessage(
+                "assistant",
+                "تم مسح الرسائل المعروضة. اكتب رسالة جديدة لبدء محادثة أخرى."
+            );
+            status.classList.remove("ready");
+            statusText.textContent = "بانتظار الرسالة";
+            setNotice("تم مسح المحادثة المعروضة.");
+            promptInput.focus();
+        });
 
         promptInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter" && !event.shiftKey) {
