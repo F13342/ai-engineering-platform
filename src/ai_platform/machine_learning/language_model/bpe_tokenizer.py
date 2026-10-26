@@ -228,6 +228,12 @@ class BPETokenizer:
                 raise TypeError("Token IDs must be integers.")
             if token_id < 0 or token_id >= self.vocab_size:
                 raise ValueError(f"Token ID out of range: {token_id}")
+            if token_id == self.unk_token_id:
+                if skip_special_tokens:
+                    pieces.append("\uFFFD")
+                else:
+                    pieces.append(self.id_to_token[token_id])
+                continue
             if skip_special_tokens and token_id in self._special_token_ids:
                 continue
             pieces.append(self.id_to_token[token_id])

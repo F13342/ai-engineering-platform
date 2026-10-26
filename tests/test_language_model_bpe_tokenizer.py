@@ -40,7 +40,7 @@ def test_unknown_character_uses_unknown_token():
     tokenizer = BPETokenizer.fit("abcdef abcdef", vocab_size=32)
 
     assert tokenizer.encode("?") == [tokenizer.unk_token_id]
-    assert tokenizer.decode([tokenizer.unk_token_id]) == ""
+    assert tokenizer.decode([tokenizer.unk_token_id]) == "\uFFFD"
     assert tokenizer.decode(
         [tokenizer.unk_token_id], skip_special_tokens=False
     ) == "<unk>"
