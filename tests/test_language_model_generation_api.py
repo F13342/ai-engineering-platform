@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 
 import httpx
 import pytest
@@ -64,6 +64,10 @@ def test_language_model_generate_returns_text_and_metrics() -> None:
 
     response = generate_request(app, {
         "prompt": "Hello",
+        "history": [
+            {"role": "user", "content": "My project is Atlas"},
+            {"role": "assistant", "content": "I will help with Atlas"},
+        ],
         "max_new_tokens": 24,
         "temperature": 0.8,
         "top_k": 10,
@@ -72,17 +76,23 @@ def test_language_model_generate_returns_text_and_metrics() -> None:
     assert response.status_code == 200
     assert response.json()["text"] == "Hello from the test model."
     assert response.json()["generation_latency_ms"] >= 0
-    assert service.calls == [{
-        "prompt": "Hello",
-        "max_new_tokens": 24,
-        "temperature": 0.8,
-        "top_k": 10,
-    }]
+    assert len(service.calls) == 1
+
+    call = service.calls[0]
+    assert "AI Engineering Platform" in call["prompt"]
+    assert "My project is Atlas" in call["prompt"]
+    assert "I will help with Atlas" in call["prompt"]
+    assert "Hello" in call["prompt"]
+
+    assert call["max_new_tokens"] == 24
+    assert call["temperature"] == 0.8
+    assert call["top_k"] == 10
 
 
 def test_language_model_generate_returns_503_when_unconfigured(
     monkeypatch,
 ) -> None:
+    monkeypatch.delenv("AI_PLATFORM_LLM_PROVIDER", raising=False)
     monkeypatch.delenv("AI_PLATFORM_LANGUAGE_MODEL_CHECKPOINT", raising=False)
     app = create_app(language_model_generation_service=None)
 
@@ -163,3 +173,80 @@ def test_language_model_generate_returns_503_for_missing_checkpoint() -> None:
 
     assert response.status_code == 503
     assert "private server path" not in response.text
+
+def test_language_model_generate_uses_local_ollama(monkeypatch):
+    monkeypatch.setenv("AI_PLATFORM_LLM_PROVIDER", "ollama")
+    monkeypatch.delenv(
+        "AI_PLATFORM_LANGUAGE_MODEL_CHECKPOINT",
+        raising=False,
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"response": "مرحبًا من Gemma"}
+
+    def fake_post(url, json, timeout):
+        captured["url"] = url
+        captured["payload"] = json
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        "ai_platform.machine_learning.language_model.ollama_provider.httpx.post",
+        fake_post,
+    )
+
+    app = create_app()
+    response = generate_request(app, {
+        "prompt": "اشرح الذكاء الاصطناعي",
+        "max_new_tokens": 40,
+    })
+
+    assert response.status_code == 200
+    assert response.json()["text"] == "مرحبًا من Gemma"
+    assert captured["url"] == (
+        "http://127.0.0.1:11434/api/generate"
+    )
+    assert captured["payload"]["model"] == "gemma3:4b"
+
+
+def test_language_model_generate_returns_503_when_ollama_is_unavailable(
+    monkeypatch,
+):
+    monkeypatch.setenv("AI_PLATFORM_LLM_PROVIDER", "ollama")
+
+    def fake_post(*args, **kwargs):
+        raise httpx.ConnectError("Connection refused")
+
+    monkeypatch.setattr(
+        "ai_platform.machine_learning.language_model.ollama_provider.httpx.post",
+        fake_post,
+    )
+
+    app = create_app()
+    response = generate_request(app, {"prompt": "Hello"})
+
+    assert response.status_code == 503
+    assert "Cannot reach" in response.json()["detail"]
+
+def test_prompt_builder_preserves_arabic_identity_instructions():
+    from ai_platform.api.app import _build_language_model_prompt
+    from ai_platform.api.schemas import LanguageModelGenerationRequest
+
+    request = LanguageModelGenerationRequest(
+        prompt="What is my name?",
+    )
+    prompt = _build_language_model_prompt(request)
+
+    arabic_count = sum(
+        chr(0x0600) <= char <= chr(0x06FF)
+        for char in prompt
+    )
+
+    assert arabic_count > 100
+    assert "????" not in prompt
+    assert "AI Engineering Platform" in prompt

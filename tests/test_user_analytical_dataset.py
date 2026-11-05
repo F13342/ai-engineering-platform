@@ -1,4 +1,7 @@
-﻿from ai_platform.database.analytics.user_activity import (
+from importlib import import_module
+
+from ai_platform.database.connection import get_connection
+from ai_platform.database.analytics.user_activity import (
     build_user_analytical_dataset,
 )
 from ai_platform.database.repositories.conversation_repository import (
@@ -7,14 +10,44 @@ from ai_platform.database.repositories.conversation_repository import (
 from ai_platform.database.repositories.document_repository import (
     DocumentRepository,
 )
-from ai_platform.database.repositories.message_repository import MessageRepository
-from ai_platform.database.repositories.project_repository import ProjectRepository
-from ai_platform.database.repositories.user_repository import UserRepository
+from ai_platform.database.repositories.message_repository import (
+    MessageRepository,
+)
+from ai_platform.database.repositories.project_repository import (
+    ProjectRepository,
+)
+from ai_platform.database.repositories.user_repository import (
+    UserRepository,
+)
 from ai_platform.database.schema import initialize_schema
 
 
-def test_user_analytical_dataset() -> None:
-    """Test the complete user analytical dataset."""
+def test_user_analytical_dataset(tmp_path, monkeypatch) -> None:
+    """Test the complete user analytical dataset using isolated SQLite."""
+
+    database_path = tmp_path / "analytical_dataset.db"
+
+    def temporary_connection():
+        return get_connection(database_path)
+
+    database_modules = [
+        "ai_platform.database.schema",
+        "ai_platform.database.repositories.user_repository",
+        "ai_platform.database.repositories.project_repository",
+        "ai_platform.database.repositories.conversation_repository",
+        "ai_platform.database.repositories.message_repository",
+        "ai_platform.database.repositories.document_repository",
+        "ai_platform.database.analytics.user_activity",
+    ]
+
+    for module_name in database_modules:
+        module = import_module(module_name)
+        monkeypatch.setattr(
+            module,
+            "get_connection",
+            temporary_connection,
+        )
+
     initialize_schema()
 
     user_repository = UserRepository()
@@ -76,7 +109,3 @@ def test_user_analytical_dataset() -> None:
     assert result["average_activity"] == 5.0
     assert result["difference_from_average"] == 0.0
     assert result["activity_level"] == "Medium"
-
-    conversation_repository.delete_conversation(conversation_id)
-    project_repository.delete_project(project_id)
-    user_repository.delete_user(user_id)

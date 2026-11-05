@@ -28,6 +28,13 @@ dev = [
 ml = [
     "torch"
 ]
+documents = [
+    "python-docx",
+    "python-pptx",
+    "reportlab",
+    "arabic-reshaper",
+    "python-bidi",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

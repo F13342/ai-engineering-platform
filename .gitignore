@@ -31,3 +31,12 @@ artifacts/models/
 
 # Local training runs and checkpoints
 runs/
+
+# Local runtime data
+/runtime_data/
+
+# Imported Ollama model blobs
+/sha256-*
+# Local database backups and inspection files
+/database/backups/
+/persistence_inspection.txt

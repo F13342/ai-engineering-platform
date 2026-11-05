@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 
 import httpx
 
@@ -32,7 +32,19 @@ def test_chat_page_returns_html() -> None:
     assert 'id="prompt"' in html
     assert 'X-API-Key' in html
     assert '/v1/language-model/generate' in html
-    assert "localStorage" not in html
+    # Persist only the active conversation ID.
+    # Never persist API keys or conversation message contents.
+    import re
+
+    storage_keys = re.findall(
+        r"localStorage\.setItem\(\s*([^,\n]+)",
+        html,
+    )
+
+    assert storage_keys == ["ACTIVE_CONVERSATION_KEY"]
+    assert "ACTIVE_CONVERSATION_KEY" in html
+    assert "apiKey" in html
+
     assert "sessionStorage" not in html
 
 

@@ -1,4 +1,4 @@
-﻿"""Request and response schemas for the AI Platform API."""
+"""Request and response schemas for the AI Platform API."""
 
 from typing import Any, Literal
 
@@ -109,12 +109,34 @@ class ActiveModelVersionResponse(BaseModel):
     parameters: dict[str, Any]
 
 
+class ConversationMessage(BaseModel):
+    """One validated message from the current conversation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("content")
+    @classmethod
+    def content_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Message content must not be blank.")
+        return value
+
+
 class LanguageModelGenerationRequest(BaseModel):
     """Validated request for local language-model generation."""
 
     model_config = ConfigDict(extra="forbid")
 
     prompt: str = Field(min_length=1, max_length=4000)
+    conversation_id: int | None = Field(default=None, gt=0)
+    history: list[ConversationMessage] = Field(
+        default_factory=list,
+        max_length=6,
+    )
     max_new_tokens: int = Field(default=100, ge=1, le=512)
     temperature: float = Field(default=1.0, gt=0, le=2.0)
     top_k: int | None = Field(default=None, ge=1)
@@ -132,3 +154,59 @@ class LanguageModelGenerationResponse(BaseModel):
 
     text: str
     generation_latency_ms: float = Field(ge=0)
+    conversation_id: int | None = None
+
+
+class ConversationCreateRequest(BaseModel):
+    """Validated request for creating a local conversation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(default="New conversation", min_length=1, max_length=200)
+
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Conversation title cannot be blank.")
+        return value
+
+
+class ConversationSummaryResponse(BaseModel):
+    conversation_id: int
+    title: str
+    created_at: str
+
+
+class StoredConversationMessageResponse(BaseModel):
+    message_id: int
+    role: str
+    content: str
+    created_at: str
+
+
+class ConversationDetailResponse(BaseModel):
+    conversation_id: int
+    title: str
+    created_at: str
+    messages: list[StoredConversationMessageResponse]
+
+
+class DocumentGenerationRequest(BaseModel):
+    """Validated request for generating a downloadable document."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=20000)
+    output_format: Literal["docx", "pdf", "pptx"]
+    language: Literal["ar", "en"] = "en"
+
+    @field_validator("title", "content")
+    @classmethod
+    def text_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("This field must not be blank.")
+        return value

@@ -1,4 +1,4 @@
-﻿from ai_platform.database.connection import get_connection
+from ai_platform.database.connection import get_connection
 
 
 class MessageRepository:
@@ -23,6 +23,60 @@ class MessageRepository:
             )
             connection.commit()
             return int(cursor.lastrowid)
+        finally:
+            connection.close()
+
+    def create_message_pair(
+        self,
+        user_id: int,
+        conversation_id: int,
+        user_content: str,
+        assistant_content: str,
+    ) -> tuple[int, int]:
+        """Atomically save a user message and its assistant reply."""
+        connection = get_connection()
+
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+
+            owned = connection.execute(
+                """
+                SELECT 1
+                FROM conversations
+                WHERE conversation_id = ? AND user_id = ?
+                """,
+                (conversation_id, user_id),
+            ).fetchone()
+
+            if owned is None:
+                raise LookupError("Conversation not found.")
+
+            user_cursor = connection.execute(
+                """
+                INSERT INTO messages (conversation_id, role, content)
+                VALUES (?, 'user', ?)
+                """,
+                (conversation_id, user_content),
+            )
+
+            assistant_cursor = connection.execute(
+                """
+                INSERT INTO messages (conversation_id, role, content)
+                VALUES (?, 'assistant', ?)
+                """,
+                (conversation_id, assistant_content),
+            )
+
+            message_ids = (
+                int(user_cursor.lastrowid),
+                int(assistant_cursor.lastrowid),
+            )
+            connection.commit()
+            return message_ids
+
+        except Exception:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
